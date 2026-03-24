@@ -1,0 +1,33 @@
+from ultralytics import YOLO
+import cv2
+
+# 1. Tải model YOLOv8 phiên bản Nano (nhẹ và nhanh nhất)
+model = YOLO('yolov8n.pt') 
+
+# 2. Mở Webcam
+cap = cv2.VideoCapture(0)
+
+print("Đang chạy YOLO... Nhấn 'q' để thoát.")
+
+while cap.isOpened():
+    success, frame = cap.read()
+
+    if success:
+        # 3. Chạy AI nhận diện trên khung hình
+        # conf=0.5 nghĩa là chỉ hiện vật thể nếu độ tự tin trên 50%
+        results = model(frame, conf=0.5)
+
+        # 4. Vẽ kết quả lên khung hình
+        annotated_frame = results[0].plot()
+
+        # 5. Hiển thị
+        cv2.imshow("YOLOv8 Real-time Detection", annotated_frame)
+
+        # Thoát nếu nhấn 'q'
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+    else:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
