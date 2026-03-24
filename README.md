@@ -1,7 +1,7 @@
 # Some Simple Project about AI and Computer Vision
-Kho lưu trữ các project do Trường Giang và Gemini xây dựng=))
+Archive of projects built by Truong Giang and Gemini =))
 # Features about project
-* Nhận diện và xác định vật thể với xác suất cao
-* Hiển thị nét vẽ trong không khí vào màn hình
-* Kiểm tra sản phẩm lỗi hoặc đạt bằng AI
+* Identify and pinpoint objects with high probability.
+* Displays drawings in the air on the screen.
+* Inspect products for defects or passability using AI.
 # Tools and Libary
