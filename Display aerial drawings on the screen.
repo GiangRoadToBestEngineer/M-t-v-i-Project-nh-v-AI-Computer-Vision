@@ -1,39 +1,91 @@
 import cv2
 import mediapipe as mp
+import numpy as np  # Thêm thư viện NumPy để xử lý ảnh nền
 
-# MediaPipe chuẩn sẽ gọi được lệnh này mượt mà
+# Thiết lập MediaPipe
 mp_hands = mp.solutions.hands
 mp_draw = mp.solutions.drawing_utils
 hands = mp_hands.Hands(min_detection_confidence=0.8, min_tracking_confidence=0.5, max_num_hands=1)
 
 cap = cv2.VideoCapture(0)
 
+# 1. Tạo "Bảng vẽ" (Canvas) ban đầu: một mảng ảnh đen có cùng kích thước với khung hình
+ret, frame = cap.read()
+if ret:
+    h, w, c = frame.shape
+    paint_canvas = np.zeros((h, w, c), dtype=np.uint8)  # Ảnh đen hoàn toàn
+else:
+    print("Không thể khởi động camera.")
+    cap.release()
+    exit()
+
+# 2. Các biến để quản lý nét vẽ
+prev_x, prev_y = 0, 0  # Lưu tọa độ của ngón tay ở khung hình trước
+drawing_color = (0, 255, 255)  # Màu sắc của nét vẽ (Màu vàng Cyan)
+brush_thickness = 10  # Độ dày của nét vẽ
+
 print("Camera đang khởi động... Đưa tay lên nào!")
+print("Nhấn 'c' để xóa màn hình, 'q' để thoát.")
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
-    frame = cv2.flip(frame, 1)
+    frame = cv2.flip(frame, 1)  # Lật ảnh để thuận tay như soi gương
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     result = hands.process(rgb_frame)
 
     if result.multi_hand_landmarks:
         for hand_landmarks in result.multi_hand_landmarks:
-            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-            
+            # mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS) # Tắt vẽ bộ xương để nét vẽ đẹp hơn
+
             # Lấy tọa độ ngón trỏ (điểm số 8)
             x = int(hand_landmarks.landmark[8].x * frame.shape[1])
             y = int(hand_landmarks.landmark[8].y * frame.shape[0])
-            
-            # Vẽ một chấm tròn đỏ ở đầu ngón trỏ
-            cv2.circle(frame, (x, y), 15, (0, 0, 255), cv2.FILLED)
 
-    cv2.imshow("Air Canvas", frame)
+            # Vẽ một chấm tròn đỏ nhỏ ở đầu ngón trỏ để định vị
+            cv2.circle(frame, (x, y), 8, (0, 0, 255), cv2.FILLED)
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+            # --- PHẦN LOGIC ĐỂ VẼ NÉT LƯU LẠI ---
+            # Chỉ bắt đầu vẽ nếu ngón tay đã di chuyển (prev_x, prev_y khác 0)
+            if prev_x == 0 and prev_y == 0:
+                prev_x, prev_y = x, y
+            else:
+                # Vẽ đường thẳng nối điểm trước và điểm hiện tại LÊN BẢNG VẼ (paint_canvas)
+                cv2.line(paint_canvas, (prev_x, prev_y), (x, y), drawing_color, brush_thickness)
+                
+                # Cập nhật tọa độ cũ
+                prev_x, prev_y = x, y
+    else:
+        # Nếu không nhận diện thấy tay, đặt lại tọa độ trước về 0 để không bị nối nét khi tay xuất hiện lại
+        prev_x, prev_y = 0, 0
+
+    # 3. CHỒNG ẢNH: Gộp nét vẽ từ Bảng vẽ lên khung hình camera
+    # Cách 1 (Đơn giản): Dùng bitwise_or để gộp màu
+    # frame = cv2.bitwise_or(frame, paint_canvas)
+
+    # Cách 2 (Đẹp hơn): Dùng mặt nạ (mask) để nét vẽ hòa trộn tự nhiên
+    gray_canvas = cv2.cvtColor(paint_canvas, cv2.COLOR_BGR2GRAY)
+    _, mask = cv2.threshold(gray_canvas, 10, 255, cv2.THRESH_BINARY)
+    mask_inv = cv2.bitwise_not(mask)
+    
+    # Lấy phần nền của camera trừ đi vùng sẽ vẽ nét
+    bg = cv2.bitwise_and(frame, frame, mask=mask_inv)
+    # Lấy chỉ nét vẽ từ Bảng vẽ
+    fg = cv2.bitwise_and(paint_canvas, paint_canvas, mask=mask)
+    # Gộp 2 phần lại
+    frame = cv2.add(bg, fg)
+
+    # 4. Hiển thị thông tin
+    cv2.imshow("Air Canvas (Camera Feed)", frame)
+    cv2.imshow("Nét vẽ thực (Internal Canvas)", paint_canvas) # Hiển thị thêm bảng nét vẽ thực để hiểu cơ chế
+
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'): # Nhấn q để thoát
         break
+    elif key == ord('c'): # Nhấn c để xóa màn hình (reset lại canvas đen)
+        paint_canvas = np.zeros((h, w, c), dtype=np.uint8)
 
 cap.release()
 cv2.destroyAllWindows()
