@@ -1,4 +1,4 @@
-# Some Simple Project about AI and Computer Vision
+# Some Simple Project about AI, Computer Vision and Control system
 Archive of projects built by Truong Giang and Gemini =))
 # Features about project
 * Identify and pinpoint objects with high probability.
