@@ -1,0 +1,113 @@
+import os
+# 1. Sửa lỗi tương thích Keras và tắt log thừa của TensorFlow
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
+import cv2
+import numpy as np
+import threading
+import winsound
+import tkinter as tk
+from tkinter import messagebox
+from tf_keras.models import load_model
+
+# --- CẤU HÌNH HỆ THỐNG ---
+MODEL_PATH = "keras_model.h5"
+LABELS_PATH = "labels.txt"
+THRESHOLD = 0.85      # Độ tự tin trên 85% mới báo lỗi
+SKIP_FRAMES = 5       # Cứ 5 khung hình mới cho AI đoán 1 lần (Giúp camera mượt)
+
+# --- KHỞI TẠO ---
+print("--- DANG KHOI DONG BO NAO AI... VUI LONG DOI ---")
+try:
+    model = load_model(MODEL_PATH, compile=False)
+    # Đọc nhãn và làm sạch khoảng trắng
+    class_names = [line.strip() for line in open(LABELS_PATH, "r").readlines()]
+    print("--- HE THONG DA SAN SANG! ---")
+    print(f"Danh sach nhan: {class_names}")
+except Exception as e:
+    print(f"Loi khoi tao: {e}")
+    exit()
+
+is_alerting = False
+count_frame = 0
+current_label = "Dang cho..."
+current_conf = 0
+current_color = (0, 255, 0) # Màu mặc định là XANH LÁ
+is_bad_product = False
+
+# Hàm xử lý thông báo lỗi (Chạy trên luồng riêng)
+def show_alert():
+    global is_alerting
+    is_alerting = True
+    
+    # Phát tiếng bíp báo động (Tần số 1500Hz, kéo dài 800ms)
+    winsound.Beep(1500, 800) 
+    
+    # Hiện hộp thoại thông báo
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True) # Đưa thông báo lên trên cùng
+    messagebox.showwarning("CANH BAO VISION", "PHAT HIEN SAN PHAM LOI (BUT CHUAA DONG NAP)!")
+    root.destroy()
+    
+    is_alerting = False
+
+# Mở camera
+cap = cv2.VideoCapture(0)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    count_frame += 1
+
+    # CHỈ XỬ LÝ AI SAU MỖI 5 KHUNG HÌNH (TỐI ƯU TỐC ĐỘ)
+    if count_frame % SKIP_FRAMES == 0:
+        # Tiền xử lý ảnh cho Teachable Machine (224x224)
+        resized_frame = cv2.resize(frame, (224, 224), interpolation=cv2.INTER_NEAREST)
+        image_array = np.asarray(resized_frame, dtype=np.float32).reshape(1, 224, 224, 3)
+        image_normalized = (image_array / 127.5) - 1
+
+        # AI dự đoán
+        prediction = model.predict(image_normalized, verbose=0)
+        index = np.argmax(prediction)
+        current_conf = prediction[0][index]
+        
+        # --- LOGIC XỬ LÝ KẾT QUẢ VÀ MÀU SẮC ---
+        # Giả sử dòng thứ 2 (index 1) trong labels.txt là LỖI
+        is_bad_product = (index == 1) and (current_conf > THRESHOLD)
+        
+        if is_bad_product:
+            current_label = "LOI"
+            current_color = (0, 0, 255) # Màu ĐỎ khi lỗi
+            
+            # Kích hoạt báo động nếu chưa có thông báo nào đang hiện
+            if not is_alerting:
+                print("!!! PHAT HIEN LOI - DANG BAO DONG !!!")
+                threading.Thread(target=show_alert).start()
+        else:
+            current_label = "OK"
+            current_color = (0, 255, 0) # Màu XANH LÁ khi ổn
+
+    # --- HIỂN THỊ GIAO DIỆN (ĐỒNG NHẤT MÀU SẮC) ---
+    # 1. Vẽ ô vuông trung tâm (Dùng current_color)
+    h, w, _ = frame.shape
+    cv2.rectangle(frame, (w//4, h//4), (3*w//4, 3*h//4), current_color, 2)
+    
+    # 2. Hiển thị thông tin trạng thái lên màn hình (Dùng current_color)
+    display_text = f"Status: {current_label} ({current_conf*100:.1f}%)"
+    cv2.putText(frame, display_text, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, current_color, 2)
+    
+    # Hiển thị
+    cv2.imshow("AI Vision Inspection - Press 'q' to Quit", frame)
+
+    # Nhấn 'q' để thoát sạch sẽ
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Giải phóng tài nguyên
+cap.release()
+cv2.destroyAllWindows()
+print("--- DA DONG CHUONG TRINH ---")

@@ -1,0 +1,2 @@
+0 Its OK
+1 Its ERROR
