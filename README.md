@@ -6,7 +6,7 @@ Archive of projects built by Truong Giang and Gemini =))
 * Inspect products for defects or passability using AI.
 * Automating the plant growing process with liquid fertilizer.
 # Tools and Libary
-* Computer Vision: OpenCV , Numpy , YOLOv
+* Computer Vision: OpenCV , Numpy , YOLOv , matplotib
 * AI and Machine Learning: mediapipe , Tensorflow Keras Model
 * GUI: tkinter
 * System and Multithreading Support Team: winsound , threading
