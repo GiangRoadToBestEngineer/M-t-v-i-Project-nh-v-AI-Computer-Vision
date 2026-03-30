@@ -1,0 +1,66 @@
+import cv2
+import time
+
+# 1. Khởi tạo bộ nhận diện
+xml_path = r'C:\Users\NEOVIA\Desktop\01\haarcascade_frontalface_default.xml'
+xml_path1 = r'C:\Users\NEOVIA\Desktop\01\haarcascade_eye.xml'
+xml_path2 = r'C:\Users\NEOVIA\Desktop\01\haarcascade_fullbody.xml'
+face_cascade = cv2.CascadeClassifier(xml_path)
+eye_cascade = cv2.CascadeClassifier(xml_path1)
+body_cascade = cv2.CascadeClassifier(xml_path2)
+# 2. Mở Webcam
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+if not cap.isOpened():
+    print("Không thể mở Webcam!")
+    exit()
+
+
+
+while True:
+    prev_time = time.time()
+    # Đọc ảnh thu đầu vào:
+    ret, frame = cap.read()
+    if not ret: break
+# --- BƯỚC RESIZE:Tối ưu hóa fps ---
+    # Tỉ lệ scale (0.5 là giảm một nửa kích thước)
+    scale = 0.5 
+    width = int(frame.shape[1] * scale)
+    height = int(frame.shape[0] * scale)
+    # Tạo một bản sao nhỏ để xử lý tính toán
+    small_frame = cv2.resize(frame, (width, height))
+    # 3. Xử lý nhận diện
+    gray_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
+    
+    faces = face_cascade.detectMultiScale(gray_frame, 1.3, 5, minSize=(30, 30))
+    eyes = eye_cascade.detectMultiScale(gray_frame, 1.3, 5, minSize=(15, 15)) # Mắt thường nhỏ hơn mặt
+    body = body_cascade.detectMultiScale(gray_frame,1.3,5,minSize=(50,50))# Body thường rất to
+    # 4. Vẽ nhận diện
+    for (x, y, w, h) in faces:
+        cv2.rectangle(frame, (int(x/scale), int(y/scale)), (int((x+w)/scale), int((y+h)/scale)), (0, 255, 0), 2)
+        cv2.putText(frame, "Face", (int(x/scale), int(y/scale)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    for (x, y, w, h) in eyes:
+        cv2.rectangle(frame, (int(x/scale), int(y/scale)), (int((x+w)/scale), int((y+h)/scale)), (255, 0, 0), 2)
+        cv2.putText(frame, "Eyes", (int(x/scale), int(y/scale)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+    
+    for (x,y,w,h) in body:
+       cv2.rectangle(frame, (int(x/scale), int(y/scale)), (int((x+w)/scale), int((y+h)/scale)), (0, 0, 255), 2)
+       cv2.putText(frame, "Body", (int(x/scale), int(y/scale)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    # 5. Tính và hiển thị FPS
+    end_time = time.time()
+    time_diff = end_time - prev_time
+    # Tránh chia cho 0 và hiển thị FPS thực tế hơn
+    fps = 1 / time_diff if time_diff > 0 else 0
+    
+    # Vẽ FPS lên màn hình (chỉnh kích thước 5 xuống 1 cho đỡ choán chỗ)
+    cv2.putText(frame, f'FPS: {fps:.2f}', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+    # 6. Hiển thị (QUAN TRỌNG: waitKey(1))
+    cv2.imshow('Real-time Detection', frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
